@@ -2,7 +2,7 @@ import numpy as np
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, Dataset
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from eufs_msgs.msg import CarState
@@ -224,22 +224,18 @@ class DataCollater:
         ])
         return quat.as_euler("XYZ")[2]
 
-class SimData(IterableDataset):
-    def __init__(self, path: str | Path, in_memory=False):
+class SimDataStream:
+    def __init__(self, path: str | Path):
+        """
+        Stream-like interface for simulation data.
+        :param path: The dataset binary file.
+        """
         super().__init__()
         path = Path(path)
         self._f = open(path, "rb")
-        self._in_memory = in_memory
-        self._cache = None
-        if self._in_memory == True:
-            self._cache = self._cache_data()
 
     def __iter__(self):
-        if self._in_memory == True:
-            return iter(self._cache)
-        else:
-            self._f.seek(0)
-            return self
+        return self
 
     def __next__(self):
         return self._read_next()
@@ -248,6 +244,16 @@ class SimData(IterableDataset):
         self._f.close()
 
     def _read_next(self) -> Tuple[TensorType, TensorType]:
+        """
+        Deserialization of binary simulation data stored in blocks with
+        the following structure:
+        ----start of block------
+        length of x tensor in bytes (2 byte integer big endian)
+        x tensor (serialized numpy array)
+        length of y tensor in bytes (2 byte integer big endian)
+        y tensor (serialized numpy array)
+        ----end of block-------
+        """
         xsize = self._f.read(2)
         if len(xsize) != 2: raise StopIteration()
         xsize = int.from_bytes(xsize, "big")
@@ -262,13 +268,28 @@ class SimData(IterableDataset):
         y = np.frombuffer(ybytes, dtype=np.float32)
         return torch.tensor(x), torch.tensor(y) 
 
+class SimData(Dataset):
+    def __init__(self, path: str | Path):
+        """
+        In-memory dataset for simulation data.
+        :param path: The dataset binary file.
+        """
+        super().__init__()
+        self._path = path
+        self._cache = self._cache_data()
+
+    def __len__(self):
+        return len(self._cache)
+
+    def __getitem__(self, idx):
+        return self._cache[idx]
+
     def _cache_data(self) -> List[Tuple[TensorType, TensorType]]:
-        result = []
-        self._f.seek(0)
-        try:
-            while True:
-                result.append(self._read_next())
-        except StopIteration: pass
+        """
+        Use a stream object to read an entire dataset into a list.
+        """
+        stream = SimDataStream(self._path)
+        result = [(x,y) for (x,y) in stream]
         return result
 
     ####################
@@ -506,7 +527,7 @@ class VehicleModel(nn.Module):
 
     def train_loop(self, dataset: SimData, batch_size: int, epochs: int, optimizer: torch.optim.Optimizer = None) -> None:
         self.train()
-        dataloader = DataLoader(dataset, batch_size=batch_size)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device="cuda:0"))
         if optimizer is None:
             optimizer = torch.optim.Adam(self.parameters())
         loss_fn = nn.MSELoss()
@@ -529,7 +550,7 @@ class VehicleModel(nn.Module):
 
     def test_loop(self, dataset: SimData, batch_size: int) -> None:
         self.train()
-        dataloader = DataLoader(dataset, batch_size=batch_size)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device="cuda:0"))
         with torch.no_grad():
             loss_fn = nn.MSELoss()
             loss_sum = 0.0
@@ -550,7 +571,7 @@ class VehicleModel(nn.Module):
         input_names = ['steering angle', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed', 'steering angle request', 'torque request']
         self.train()
         batch_size = 4096
-        dataloader = DataLoader(dataset, batch_size=batch_size)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device="cuda:0"))
         with torch.no_grad():
             losses = torch.zeros((self._output_constraints.SIZE), dtype=torch.float32)
             data_x = None
