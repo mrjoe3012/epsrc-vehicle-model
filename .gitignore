@@ -1,2 +1,6 @@
 *.bin
 *.p
+**/__pycache__
+build
+dist
+*.egg*
