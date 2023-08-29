@@ -120,7 +120,7 @@ class DataCollater:
         """
         Convert consecutive entries into a data row.
         """
-        # x: [steering_angle, wheel_rpms, steering_angle_request, torque_request]
+        # x: [steering_angle, wheel_rpms, steering_angle_request, acceleration_request]
         # y: d[x, y, theta, steering_angle, wheel_rpms] / dt
         dt = (next['timestamp'] - curr['timestamp']) / 1000
         x = [
@@ -129,8 +129,8 @@ class DataCollater:
             curr['vcu_status'].wheel_speeds.fr_speed,
             curr['vcu_status'].wheel_speeds.rl_speed,
             curr['vcu_status'].wheel_speeds.rr_speed,
-            curr['drive_request'].steering_angle,
-            curr['drive_request'].axle_torque
+            curr['drive_request'].ackermann.steering_angle,
+            curr['drive_request'].ackermann.acceleration
         ]
         # global position delta
         dx_g = next['car_state'].pose.pose.position.x - curr['car_state'].pose.pose.position.x
@@ -345,7 +345,7 @@ class SimData(Dataset):
         :param constraints_path: Path to the pickled dataset constraints.
         """
         output_names = ['longitudinal velocity', 'lateral velocity', 'yaw rate', 'steering angle rate', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed']
-        input_names = ['steering angle', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed', 'steering angle request', 'torque request']
+        input_names = ['steering angle', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed', 'steering angle request', 'acceleration request']
         path = Path(path)
         constraints_path = Path(constraints_path)
         dataset = SimData(path, in_memory=True)
@@ -568,7 +568,7 @@ class VehicleModel(nn.Module):
         plt.cla()
         plt.clf()
         output_names = ['longitudinal velocity', 'lateral velocity', 'yaw rate', 'steering angle rate', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed']
-        input_names = ['steering angle', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed', 'steering angle request', 'torque request']
+        input_names = ['steering angle', 'fl wheel speed', 'fr wheel speed', 'rl wheel speed', 'rr wheel speed', 'steering angle request', 'acceleration request']
         self.train()
         batch_size = 4096
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=torch.Generator(device="cuda:0"))
