@@ -429,8 +429,8 @@ class SimData(Dataset):
             std_ys[std_ys == 0.0] = 1.0
             print(f"Input (mean, std): {np.vstack([mean_xs, std_xs]).T}")
             print(f"Output (mean, std): {np.vstack([mean_ys, std_ys]).T}")
-            return InputConstraints(torch.tensor(mean_xs), torch.tensor(std_xs)), \
-                OutputConstraints(torch.tensor(mean_ys), torch.tensor(std_ys))
+            return InputConstraints(torch.tensor(mean_xs, dtype=torch.float32), torch.tensor(std_xs, dtype=torch.float32)), \
+                OutputConstraints(torch.tensor(mean_ys, dtype=torch.float32), torch.tensor(std_ys, dtype=torch.float32))
 
 
     @staticmethod
