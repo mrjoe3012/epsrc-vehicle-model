@@ -129,8 +129,8 @@ class DataCollater:
             curr['vcu_status'].wheel_speeds.fr_speed,
             curr['vcu_status'].wheel_speeds.rl_speed,
             curr['vcu_status'].wheel_speeds.rr_speed,
-            curr['drive_request'].ackermann.steering_angle,
-            curr['drive_request'].ackermann.acceleration
+            curr['drive_request'].ackermann.drive.steering_angle,
+            curr['drive_request'].ackermann.drive.acceleration
         ]
         # global position delta
         dx_g = next['car_state'].pose.pose.position.x - curr['car_state'].pose.pose.position.x
